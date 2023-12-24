@@ -1,4 +1,4 @@
-from advanced_alchemy.exceptions import ConflictError
+from advanced_alchemy.exceptions import ConflictError, NotFoundError
 from advanced_alchemy.filters import CollectionFilter, SearchFilter
 from litestar import Controller, get, patch, post
 from litestar.di import Provide
@@ -65,12 +65,37 @@ class BookController(Controller):
     dependencies = {"books_repo": Provide(provide_books_repo)}
 
     @get()
-    async def list_books(self, books_repo: BookRepository) -> list[Book]:
-        return books_repo.list()
+    async def list_books(self, books_repo: BookRepository, available_copies: bool = False, categories: list[str] = []) -> list[Book]:
+        #return books_repo.list()
+        try:
+            # Utiliza los parámetros de filtro en el repositorio
+            return books_repo.list(available_copies=available_copies, categories=categories)
+        except NotFoundError as e:
+            raise HTTPException(detail="Books not found", status_code=404) from e
 
     @get("/search")
     async def search_books(self, books_repo: BookRepository, q: str) -> list[Book]:
-        return books_repo.list(SearchFilter("title", q))
+        #return books_repo.list(SearchFilter("title", q))    #SearchFilter es una clase de advanced_alchemy, que permite hacer busquedas en la base de datos por un campo especifico
+        try:
+            # Utiliza la clase SearchFilter para realizar la búsqueda
+            return books_repo.list(SearchFilter("title", q))    #list() es una función de advanced_alchemy, que permite listar los resultados de una búsqueda 
+        except NotFoundError as e:
+            raise HTTPException(detail="Books not found", status_code=404) from e
+
+    @get("/filter")
+    async def filter_books(
+        self,
+        books_repo: BookRepository,
+        available_copies: bool = False,
+        categories: list[str] = [],
+    ) -> list[Book]:
+        try:
+            # Utiliza los parámetros de filtro en el repositorio
+            return books_repo.list(available_copies=available_copies, categories=categories)
+        except NotFoundError as e:
+            raise HTTPException(detail="Books not found", status_code=404) from e
+
+
 
     @get("/{book_id:int}", return_dto=dtos.BookReadFullDTO)
     async def get_book(self, book_id: int, books_repo: BookRepository) -> Book:
